@@ -1,4 +1,5 @@
 #include "Cafe/HW/Latte/ISA/RegDefines.h"
+#include "Common/DrcdClient.h"
 
 #include "Cafe/HW/Latte/Core/Latte.h"
 #include "Cafe/HW/Latte/Core/LatteDraw.h"
@@ -983,6 +984,13 @@ void LatteRenderTarget_itHLECopyColorBufferToScanBuffer(MPTR colorBufferPtr, uin
 	if (!texView)
 	{
 		return;
+	}
+
+	if ((renderTarget & RENDER_TARGET_DRC) && !swkbd_hasKeyboardInputHook() && DrcdClient::WantsFrame())
+	{
+		LatteTexture_UpdateDataToLatest(texView->baseTexture);
+		LatteTC_MarkTextureStillInUse(texView->baseTexture);
+		g_renderer->CaptureDrcdFrame(texView);
 	}
 
 	auto getVPADScreenActive = [](size_t n) -> std::pair<bool, bool> {

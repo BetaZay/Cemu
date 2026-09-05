@@ -71,6 +71,12 @@ public:
 	void CancelScreenshotRequest();
 
 	virtual void HandleScreenshotRequest(LatteTextureView* texView, bool padView){}
+	void CaptureDrcdFrame(LatteTextureView* texView)
+	{
+		m_drcdCapture = true;
+		HandleScreenshotRequest(texView, true);
+		m_drcdCapture = false;
+	}
 
 	virtual void DrawBackbufferQuad(LatteTextureView* texView, RendererOutputShader* shader, bool useLinearTexFilter,
 												sint32 imageX, sint32 imageY, sint32 imageWidth, sint32 imageHeight,
@@ -175,6 +181,7 @@ protected:
 	};
 	ScreenshotState m_screenshot_state = ScreenshotState::None;
 	bool m_screenshot_requested = false;
+	bool m_drcdCapture = false;
 	ScreenshotSaveFunction m_on_save_screenshot;
 
 	void SaveScreenshot(const std::vector<uint8>& rgb_data, int width, int height, bool mainWindow);

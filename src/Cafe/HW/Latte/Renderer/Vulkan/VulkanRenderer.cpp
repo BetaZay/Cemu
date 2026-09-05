@@ -1,4 +1,6 @@
 #include "Cafe/HW/Latte/Renderer/Vulkan/VulkanRenderer.h"
+#include "Common/DrcdClient.h"
+#include "imgui/DrcdOverlay.h"
 #include "Cafe/HW/Latte/Renderer/Vulkan/VulkanAPI.h"
 #include "Cafe/HW/Latte/Renderer/Vulkan/LatteTextureVk.h"
 #include "Cafe/HW/Latte/Renderer/Vulkan/RendererShaderVk.h"
@@ -964,27 +966,29 @@ bool VulkanRenderer::IsPadWindowActive()
 
 void VulkanRenderer::HandleScreenshotRequest(LatteTextureView* texView, bool padView)
 {
-	if (!m_screenshot_requested && m_screenshot_state == ScreenshotState::None)
-		return;
-
-	if (IsSwapchainInfoValid(false))
+	// Unlike the window screenshot path, direct DRC scanout can arrive while
+	// a game render pass is open. Copies and layout barriers must be outside it.
+	if (m_drcdCapture)
+		draw_endRenderPass();
+	if (!m_drcdCapture)
 	{
-		// we already took a pad view screenshow and want a main window screenshot
-		if (m_screenshot_state == ScreenshotState::Main && padView)
+		if (!m_screenshot_requested && m_screenshot_state == ScreenshotState::None)
 			return;
-
-		if (m_screenshot_state == ScreenshotState::Pad && !padView)
-			return;
-
-		// remember which screenshot is left to take
-		if (m_screenshot_state == ScreenshotState::None)
-			m_screenshot_state = padView ? ScreenshotState::Main : ScreenshotState::Pad;
+		if (IsSwapchainInfoValid(false))
+		{
+			if (m_screenshot_state == ScreenshotState::Main && padView)
+				return;
+			if (m_screenshot_state == ScreenshotState::Pad && !padView)
+				return;
+			// Remember which screenshot is left to take; streaming bypasses this state.
+			if (m_screenshot_state == ScreenshotState::None)
+				m_screenshot_state = padView ? ScreenshotState::Main : ScreenshotState::Pad;
+			else
+				m_screenshot_state = ScreenshotState::None;
+		}
 		else
 			m_screenshot_state = ScreenshotState::None;
 	}
-	else
-		m_screenshot_state = ScreenshotState::None;
-
 	auto texViewVk = (LatteTextureViewVk*)texView;
 	auto baseImageTex = texViewVk->GetBaseImage();
 
@@ -1206,9 +1210,11 @@ void VulkanRenderer::HandleScreenshotRequest(LatteTextureView* texView, bool pad
 		}
 		break;
 	case VK_FORMAT_R8G8B8_UNORM:
+		rgb_data.resize(size);
 		std::copy((uint8*)bufferPtr, (uint8*)bufferPtr + size, rgb_data.begin());
 		break;
 	case VK_FORMAT_R8G8B8_SRGB:
+		rgb_data.resize(size);
 		std::transform((uint8*)bufferPtr, (uint8*)bufferPtr + size, rgb_data.begin(), SRGBComponentToRGB);
 		break;
 	default:
@@ -1226,7 +1232,12 @@ void VulkanRenderer::HandleScreenshotRequest(LatteTextureView* texView, bool pad
 		vkFreeMemory(m_logicalDevice, imageMemory, nullptr);
 
 	if (formatValid)
-		SaveScreenshot(rgb_data, width, height, !padView);
+	{
+		if (m_drcdCapture)
+			DrcdClient::SubmitFrame(std::move(rgb_data), width, height);
+		else
+			SaveScreenshot(rgb_data, width, height, !padView);
+	}
 }
 
 static const float kQueuePriority = 1.0f;
@@ -2013,6 +2024,7 @@ bool VulkanRenderer::ImguiBegin(bool mainWindow)
 void VulkanRenderer::ImguiEnd()
 {
 	ImGui::Render();
+	DrcdOverlay::PublishKeyboard(ImGui::GetCurrentContext() == imguiTVContext);
 	ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), m_state.currentCommandBuffer);
 	vkCmdEndRenderPass(m_state.currentCommandBuffer);
 }

@@ -13,6 +13,7 @@ namespace InputAPI
 		DSUClient,
 		GameCube,
 		Wiimote,
+		WiiUGamePad,
 
 		WGIGamepad,
 		WGIRawController,
@@ -32,6 +33,8 @@ namespace InputAPI
 			return "XInput";
 		case Wiimote:
 			return "Wiimote";
+		case WiiUGamePad:
+			return "WiiUGamePad";
 		case GameCube:
 			return "GameCube";
 		case DSUClient:
@@ -59,6 +62,8 @@ namespace InputAPI
 			return XInput;
 		else if (str == to_string(Wiimote))
 			return Wiimote;
+		else if (str == to_string(WiiUGamePad))
+			return WiiUGamePad;
 		else if (str == to_string(GameCube))
 			return GameCube;
 		else if (str == to_string(DSUClient))

@@ -1,4 +1,6 @@
 #include "Cafe/HW/Latte/Renderer/OpenGL/OpenGLRenderer.h"
+#include "Common/DrcdClient.h"
+#include "imgui/DrcdOverlay.h"
 #include "WindowSystem.h"
 
 #include "Cafe/HW/Latte/Core/LatteRingBuffer.h"
@@ -182,6 +184,7 @@ bool OpenGLRenderer::ImguiBegin(bool mainWindow)
 void OpenGLRenderer::ImguiEnd()
 {
 	ImGui::Render();
+	DrcdOverlay::PublishKeyboard(!m_isPadViewContext);
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
 	if (m_isPadViewContext)
@@ -516,27 +519,25 @@ void OpenGLRenderer::ClearColorbuffer(bool padView)
 
 void OpenGLRenderer::HandleScreenshotRequest(LatteTextureView* texView, bool padView)
 {
-	if(!m_screenshot_requested && m_screenshot_state == ScreenshotState::None)
-		return;
-
-	if (IsPadWindowActive())
+	if (!m_drcdCapture)
 	{
-		// we already took a pad view screenshow and want a main window screenshot
-		if (m_screenshot_state == ScreenshotState::Main && padView)
+		if (!m_screenshot_requested && m_screenshot_state == ScreenshotState::None)
 			return;
-
-		if (m_screenshot_state == ScreenshotState::Pad && !padView)
-			return;
-
-		// remember which screenshot is left to take
-		if (m_screenshot_state == ScreenshotState::None)
-			m_screenshot_state = padView ? ScreenshotState::Main : ScreenshotState::Pad;
+		if (IsPadWindowActive())
+		{
+			if (m_screenshot_state == ScreenshotState::Main && padView)
+				return;
+			if (m_screenshot_state == ScreenshotState::Pad && !padView)
+				return;
+			// Remember which screenshot is left to take; streaming bypasses this state.
+			if (m_screenshot_state == ScreenshotState::None)
+				m_screenshot_state = padView ? ScreenshotState::Main : ScreenshotState::Pad;
+			else
+				m_screenshot_state = ScreenshotState::None;
+		}
 		else
 			m_screenshot_state = ScreenshotState::None;
 	}
-	else
-		m_screenshot_state = ScreenshotState::None;
-
 	int screenshotWidth, screenshotHeight;
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
 	texture_bindAndActivate(texView, 0);
@@ -577,7 +578,10 @@ void OpenGLRenderer::HandleScreenshotRequest(LatteTextureView* texView, bool pad
 		}
 	}
 
-	SaveScreenshot(rgb_data, screenshotWidth, screenshotHeight, !padView);
+	if (m_drcdCapture)
+		DrcdClient::SubmitFrame(std::move(rgb_data), screenshotWidth, screenshotHeight);
+	else
+		SaveScreenshot(rgb_data, screenshotWidth, screenshotHeight, !padView);
 }
 
 void OpenGLRenderer::DrawBackbufferQuad(LatteTextureView* texView, RendererOutputShader* shader, bool useLinearTexFilter, sint32 imageX, sint32 imageY, sint32 imageWidth, sint32 imageHeight, bool padView, bool clearBackground)

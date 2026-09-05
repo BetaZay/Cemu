@@ -675,6 +675,46 @@ bool VPADController::set_default_mapping(const std::shared_ptr<ControllerBase>& 
 		
 		break;
 	}
+	case InputAPI::WiiUGamePad:
+	{
+		mapping =
+		{
+			{kButtonId_A, kButton0},
+			{kButtonId_B, kButton1},
+			{kButtonId_X, kButton2},
+			{kButtonId_Y, kButton3},
+
+			{kButtonId_L, kButton4},
+			{kButtonId_R, kButton5},
+			{kButtonId_ZL, kButton6},
+			{kButtonId_ZR, kButton7},
+
+			{kButtonId_Plus, kButton9},
+			{kButtonId_Minus, kButton8},
+			{kButtonId_Home, kButton10},
+
+			{kButtonId_Up, kButton11},
+			{kButtonId_Down, kButton12},
+			{kButtonId_Left, kButton13},
+			{kButtonId_Right, kButton14},
+
+			{kButtonId_StickL, kButton15},
+			{kButtonId_StickR, kButton16},
+
+			{kButtonId_StickL_Up, kAxisYP},
+			{kButtonId_StickL_Down, kAxisYN},
+			{kButtonId_StickL_Left, kAxisXN},
+			{kButtonId_StickL_Right, kAxisXP},
+
+			{kButtonId_StickR_Up, kRotationYP},
+			{kButtonId_StickR_Down, kRotationYN},
+			{kButtonId_StickR_Left, kRotationXN},
+			{kButtonId_StickR_Right, kRotationXP},
+
+			{kButtonId_Screen, kButton17},
+		};
+		break;
+	}
 	}
 
 	bool mapping_updated = false;

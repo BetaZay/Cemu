@@ -1,4 +1,5 @@
 #include "Cafe/OS/libs/snd_core/ax.h"
+#include "Common/DrcdClient.h"
 #include "Cafe/OS/libs/snd_core/ax_internal.h"
 #include "Cafe/HW/MMU/MMU.h"
 #include "audio/IAudioAPI.h"
@@ -316,6 +317,7 @@ namespace snd_core
 			outputChannel[i] = _swapEndianS16(sampleData[i]);
 		}
 
+		DrcdClient::SubmitAudio(std::span<const sint16>(outputChannel, sampleCount), channels);
 		tempDRCAudioBlockCounter++;
 		if (tempDRCAudioBlockCounter == AX_FRAMES_PER_GROUP)
 		{

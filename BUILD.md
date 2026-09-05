@@ -73,6 +73,54 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=release -DCMAKE_C_COMPILER=/usr/bin/clang
 cmake --build build
 ```
 
+#### Physical GamePad through drcd (Linux)
+
+The physical GamePad integration now uses the sibling `drc-project` daemon.
+Cemu links only its local IPC client library; it no longer builds hostapd/DHCP
+helpers or performs pairing/network setup. Override `CEMU_DRCD_PROJECT_DIR` if
+the daemon project is located elsewhere. See
+[Cemu/drcd integration](../drc-project/docs/cemu-integration.md) for launch
+commands, controls, and current GPU-readback limitations. Run Cemu unprivileged.
+
+For a physical GamePad color-transition diagnostic, close any running Cemu and
+start it from the workspace root with:
+
+```sh
+env CEMU_DRCD_SOCKET=/tmp/drcd-media.sock CEMU_DRCD_COLOR_TEST=1 ./Cemu/bin/Cemu_debug
+```
+
+No game is needed. This replaces only the physical GamePad's bridge source,
+not the desktop window, with a silent 32-second repeating sequence: black,
+red/green/blue/white cuts, black/color fades, a detailed colored checker pattern,
+and cuts/fades between that pattern and black/red. Hard cuts are two seconds
+apart; this still contains full-screen brightness/color changes. After an IPC
+connection/reconnection, ten seconds of black precede the sequence. Cemu's log
+records cycle, phase, source-relative microseconds and Unix microseconds for PC
+capture correlation; these are source-generation
+times, not on-air timestamps. Frames are generated at approximately 59.94Hz,
+without a backlog of missed frames.
+
+Keep the existing drcd capture/MCS test running in another terminal. For example,
+from `drc-project`:
+
+```sh
+sudo python scripts/test-wifi-rate.py 5 /tmp/drcd-cemu-colors.pcap --baseline-seconds 5 --seconds 120
+```
+
+The lead-in is relative to local IPC, not GamePad readiness. Judge complete cycles
+after `mcs5_start`. No Mac capture is required. This mode does not force IDRs or
+change drcd's encoder, TSF, PCM packetization or recovery settings; it establishes
+a repeatable baseline before any keyframe-policy comparison. Game audio and game
+scanout are suppressed in diagnostic mode. Restart Cemu without
+`CEMU_DRCD_COLOR_TEST` to restore normal logo/game output.
+
+Offline pattern checks:
+
+```sh
+cmake --build Cemu/build --target CemuDrcdColorTestTests --parallel 4
+./Cemu/build/src/Common/CemuDrcdColorTestTests
+```
+
 #### GCC
 
 If you are building using GCC, make sure you have g++ installed:

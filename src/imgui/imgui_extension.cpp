@@ -131,6 +131,10 @@ void ImGui_UpdateWindowInformation(bool mainWindow)
 	ImGuiIO& io = ImGui::GetIO();
 	io.BackendFlags |= ImGuiBackendFlags_HasMouseCursors;
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+	// Legacy NavInputs are imported by ImGui only with HasGamepad set, and
+	// must be cleared each frame so release events do not become held keys.
+	std::fill(std::begin(io.NavInputs), std::end(io.NavInputs), 0.0f);
+	io.BackendFlags &= ~ImGuiBackendFlags_HasGamepad;
 #if BOOST_OS_WINDOWS
 	io.ImeWindowHandle = mainWindow ? windowInfo.window_main.surface : windowInfo.window_pad.surface;
 #else
@@ -166,6 +170,7 @@ void ImGui_UpdateWindowInformation(bool mainWindow)
 		const auto controller = instance.get_controller(i);
 		if (!controller)
 			continue;
+		io.BackendFlags |= ImGuiBackendFlags_HasGamepad;
 
 		if (controller->is_start_down())
 			io.NavInputs[ImGuiNavInput_Input] = 1.0f;

@@ -11,6 +11,8 @@
 #include "config/LaunchSettings.h"
 #include "wxgui/GettingStartedDialog.h"
 #include "input/InputManager.h"
+#include "Common/DrcdClient.h"
+#include "resource/embedded/resources.h"
 #include "input/api/SDL/SDLControllerProvider.h"
 #include "wxgui/helpers/wxHelpers.h"
 #include "Cemu/ncrypto/ncrypto.h"
@@ -378,6 +380,22 @@ bool CemuApp::OnInit()
 
 	SetTopWindow(m_mainFrame);
 	m_mainFrame->Show();
+	// Reuse Cemu's existing logo asset; no external asset path or daemon privilege.
+	if (std::getenv("CEMU_DRCD_SOCKET"))
+	{
+		wxImage logo = wxBitmap(wxICON(M_WND_ICON128)).ConvertToImage().Scale(256, 256, wxIMAGE_QUALITY_HIGH);
+		std::vector<uint8> canvas(864 * 480 * 3, 24);
+		if (logo.IsOk())
+			for (unsigned y = 0; y < 256; ++y)
+				for (unsigned x = 0; x < 256; ++x)
+				{
+					if (logo.IsTransparent(x, y)) continue;
+					const size_t src = (y * 256 + x) * 3;
+					const size_t dst = ((y + 112) * 864 + x + 304) * 3;
+					std::copy_n(logo.GetData() + src, 3, canvas.data() + dst);
+				}
+		DrcdClient::Initialize(std::move(canvas), 864, 480);
+	}
 
 #if ( BOOST_OS_LINUX || BOOST_OS_BSD ) && HAS_WAYLAND
 	if (wxWlIsWaylandWindow(m_mainFrame))
@@ -405,6 +423,7 @@ bool CemuApp::OnInit()
 
 int CemuApp::OnExit()
 {
+	DrcdClient::Shutdown();
 #if BOOST_OS_MACOS
 	if (m_sdlEventPumpTimer)
 	{

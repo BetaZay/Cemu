@@ -15,6 +15,10 @@ add_library(CemuInput
 	api/DSU/DSUControllerProvider.h
 	api/DSU/DSUMessages.h
 	api/DSU/DSUMessages.cpp
+	api/WiiUGamePad/WiiUGamePadController.h
+	api/WiiUGamePad/WiiUGamePadController.cpp
+	api/WiiUGamePad/WiiUGamePadControllerProvider.h
+	api/WiiUGamePad/WiiUGamePadControllerProvider.cpp
 	api/Keyboard/KeyboardControllerProvider.h
 	api/Keyboard/KeyboardControllerProvider.cpp
 	api/Keyboard/KeyboardController.cpp

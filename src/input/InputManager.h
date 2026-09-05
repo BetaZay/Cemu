@@ -9,6 +9,8 @@
 #include "input/api/Wiimote/WiimoteControllerProvider.h"
 #endif
 
+#include "input/api/WiiUGamePad/WiiUGamePadControllerProvider.h"
+
 #ifdef HAS_SDL
 #include "input/api/SDL/SDLControllerProvider.h"
 #endif

@@ -8,6 +8,7 @@
 #include "input/api/Keyboard/KeyboardController.h"
 #include "input/api/DSU/DSUController.h"
 #include "input/api/GameCube/GameCubeController.h"
+#include "input/api/WiiUGamePad/WiiUGamePadController.h"
 
 #if BOOST_OS_WINDOWS
 #include "input/api/XInput/XInputController.h"
@@ -105,6 +106,11 @@ ControllerPtr ControllerFactory::CreateController(InputAPI::Type api, std::strin
 			return std::make_shared<NativeWiimoteController>(index);
 		}
 #endif
+	case InputAPI::WiiUGamePad:
+		{
+			const auto index = ConvertString<size_t>(uuid);
+			return std::make_shared<WiiUGamePadController>(index);
+		}
 	default:
 		throw std::invalid_argument(fmt::format("unhandled controller api: {}", api));
 	}
@@ -176,6 +182,8 @@ ControllerProviderPtr ControllerFactory::CreateControllerProvider(InputAPI::Type
 	case InputAPI::Wiimote:
 		return std::make_shared<WiimoteControllerProvider>();
 #endif
+	case InputAPI::WiiUGamePad:
+		return std::make_shared<WiiUGamePadControllerProvider>();
 	default:
 		cemu_assert_debug(false);
 		return {};

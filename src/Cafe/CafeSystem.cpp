@@ -1,4 +1,5 @@
 #include "Cafe/OS/common/OSCommon.h"
+#include "Common/DrcdClient.h"
 #include "WindowSystem.h"
 #include "Cafe/OS/libs/gx2/GX2.h"
 #include "Cafe/GameProfile/GameProfile.h"
@@ -879,6 +880,7 @@ namespace CafeSystem
 		PPCTimer_waitForInit();
 		// start system
 		sSystemRunning = true;
+		DrcdClient::SetGameActive(true);
 		WindowSystem::NotifyGameLoaded();
 		std::thread t(_LaunchTitleThread);
 		t.detach();
@@ -1030,6 +1032,7 @@ namespace CafeSystem
         UnmountBaseDirectories();
         DestroyMemorySpace();
 		sSystemRunning = false;
+		DrcdClient::SetGameActive(false);
 	}
 
 	/* Virtual mlc storage */

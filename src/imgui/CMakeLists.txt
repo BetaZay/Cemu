@@ -1,3 +1,18 @@
+add_library(DrcdOverlayRaster STATIC DrcdOverlay.cpp)
+target_include_directories(DrcdOverlayRaster PUBLIC "../../dependencies/imgui/")
+target_compile_features(DrcdOverlayRaster PUBLIC cxx_std_20)
+# This pixel loop must remain realtime even in the emulator's Debug build.
+target_compile_options(DrcdOverlayRaster PRIVATE $<$<CXX_COMPILER_ID:GNU,Clang>:-O2>)
+
+add_executable(CemuDrcdOverlayTests EXCLUDE_FROM_ALL
+	DrcdOverlayTests.cpp
+	../../dependencies/imgui/imgui.cpp
+	../../dependencies/imgui/imgui_draw.cpp
+	../../dependencies/imgui/imgui_tables.cpp
+	../../dependencies/imgui/imgui_widgets.cpp
+)
+target_link_libraries(CemuDrcdOverlayTests PRIVATE DrcdOverlayRaster)
+
 add_library(imguiImpl
 	imgui_extension.cpp
 	imgui_extension.h
@@ -43,6 +58,7 @@ target_sources(imguiImpl PRIVATE
 target_include_directories(imguiImpl PUBLIC "../../dependencies/imgui/")
 
 target_link_libraries(imguiImpl PRIVATE
+	DrcdOverlayRaster
 	CemuCommon
 	CemuGui
 )

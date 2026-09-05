@@ -1,4 +1,7 @@
-add_library(CemuCommon 
+add_library(CemuCommon
+	DrcdClient.cpp
+	DrcdClient.h
+	DrcdColorTest.h
   betype.h
   cpu_features.cpp
   cpu_features.h
@@ -23,6 +26,15 @@ add_library(CemuCommon
   CafeString.h
   version.h
 )
+
+add_library(CemuDrcdColorPattern STATIC DrcdColorTest.cpp)
+target_include_directories(CemuDrcdColorPattern PUBLIC "../")
+target_compile_features(CemuDrcdColorPattern PUBLIC cxx_std_20)
+# Do not let a Debug build's pixel-generation cost confound the streaming test.
+target_compile_options(CemuDrcdColorPattern PRIVATE $<$<CXX_COMPILER_ID:GNU,Clang>:-O2>)
+target_link_libraries(CemuCommon PRIVATE CemuDrcdColorPattern)
+add_executable(CemuDrcdColorTestTests EXCLUDE_FROM_ALL DrcdColorTestTests.cpp)
+target_link_libraries(CemuDrcdColorTestTests PRIVATE CemuDrcdColorPattern)
 
 set_property(TARGET CemuCommon PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
@@ -56,6 +68,9 @@ endif()
 # CemuCommon always builts the precompiled header
 target_precompile_headers(CemuCommon PRIVATE precompiled.h)
 target_include_directories(CemuCommon PUBLIC "../")
+if(TARGET drc_ipc)
+	target_link_libraries(CemuCommon PRIVATE drc_ipc)
+endif()
 
 target_link_libraries(CemuCommon PRIVATE
 	glm::glm

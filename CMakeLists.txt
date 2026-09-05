@@ -268,4 +268,9 @@ if (NOT ZArchive_FOUND)
 	add_subdirectory("dependencies/ZArchive" EXCLUDE_FROM_ALL)
 endif()
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+	set(CEMU_DRCD_PROJECT_DIR "${CMAKE_SOURCE_DIR}/../drc-project" CACHE PATH "Standalone drcd project (local IPC client only)")
+	add_subdirectory("${CEMU_DRCD_PROJECT_DIR}/libdrc-ipc" "drc-ipc")
+endif()
+
 add_subdirectory(src)
