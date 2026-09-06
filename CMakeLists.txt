@@ -268,9 +268,4 @@ if (NOT ZArchive_FOUND)
 	add_subdirectory("dependencies/ZArchive" EXCLUDE_FROM_ALL)
 endif()
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-	set(BARISTA_APPHOOK_PROJECT_DIR "${CMAKE_SOURCE_DIR}/../Barista" CACHE PATH "Barista project (local IPC client only)")
-	add_subdirectory("${BARISTA_APPHOOK_PROJECT_DIR}/libdrc-ipc" "drc-ipc")
-endif()
-
 add_subdirectory(src)
