@@ -1,6 +1,6 @@
 #include "input/api/WiiUGamePad/WiiUGamePadControllerProvider.h"
 #include "input/api/WiiUGamePad/WiiUGamePadController.h"
-#include "Common/DrcdClient.h"
+#include "Common/BaristaAppHook.h"
 #include <algorithm>
 
 namespace
@@ -45,13 +45,13 @@ std::vector<std::shared_ptr<ControllerBase>> WiiUGamePadControllerProvider::get_
 bool WiiUGamePadControllerProvider::is_connected(size_t index) const
 {
 	std::array<uint8, 128> report{};
-	return index == 0 && DrcdClient::ReadInput(report);
+	return index == 0 && BaristaAppHook::ReadInput(report);
 }
 ControllerState WiiUGamePadControllerProvider::get_state(size_t index) const
 {
 	ControllerState state{};
 	std::array<uint8, 128> report{};
-	if (index != 0 || !DrcdClient::ReadInput(report)) return state;
+	if (index != 0 || !BaristaAppHook::ReadInput(report)) return state;
 	const uint32 buttons = DecodeButtons(report);
 	for (size_t i = 0; i < s_buttonMasks.size(); ++i)
 		state.buttons.SetButtonState(kButton0 + i, (buttons & s_buttonMasks[i]) != 0);

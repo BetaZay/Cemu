@@ -1,6 +1,6 @@
-#include "DrcdColorTest.h"
+#include "BaristaAppHookColorTest.h"
 
-namespace DrcdColorTest
+namespace BaristaAppHookColorTest
 {
 std::vector<uint8> Render(uint64 elapsedUs)
 {

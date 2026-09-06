@@ -269,8 +269,8 @@ if (NOT ZArchive_FOUND)
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-	set(CEMU_DRCD_PROJECT_DIR "${CMAKE_SOURCE_DIR}/../drc-project" CACHE PATH "Standalone drcd project (local IPC client only)")
-	add_subdirectory("${CEMU_DRCD_PROJECT_DIR}/libdrc-ipc" "drc-ipc")
+	set(BARISTA_APPHOOK_PROJECT_DIR "${CMAKE_SOURCE_DIR}/../Barista" CACHE PATH "Barista project (local IPC client only)")
+	add_subdirectory("${BARISTA_APPHOOK_PROJECT_DIR}/libdrc-ipc" "drc-ipc")
 endif()
 
 add_subdirectory(src)

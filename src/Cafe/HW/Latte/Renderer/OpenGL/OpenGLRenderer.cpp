@@ -1,5 +1,5 @@
 #include "Cafe/HW/Latte/Renderer/OpenGL/OpenGLRenderer.h"
-#include "Common/DrcdClient.h"
+#include "Common/BaristaAppHook.h"
 #include "imgui/DrcdOverlay.h"
 #include "WindowSystem.h"
 
@@ -579,7 +579,7 @@ void OpenGLRenderer::HandleScreenshotRequest(LatteTextureView* texView, bool pad
 	}
 
 	if (m_drcdCapture)
-		DrcdClient::SubmitFrame(std::move(rgb_data), screenshotWidth, screenshotHeight);
+		BaristaAppHook::SubmitFrame(std::move(rgb_data), screenshotWidth, screenshotHeight);
 	else
 		SaveScreenshot(rgb_data, screenshotWidth, screenshotHeight, !padView);
 }

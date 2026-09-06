@@ -1,4 +1,4 @@
-#include "Common/DrcdColorTest.h"
+#include "Common/BaristaAppHookColorTest.h"
 #include <algorithm>
 #include <chrono>
 #include <iostream>
@@ -6,7 +6,7 @@
 
 int main()
 {
-	using namespace DrcdColorTest;
+	using namespace BaristaAppHookColorTest;
 	auto check = [](bool ok) { if (!ok) throw std::runtime_error("color test regression"); };
 	const auto black = Render(0);
 	check(black.size() == Width * Height * 3);

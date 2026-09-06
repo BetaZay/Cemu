@@ -1,47 +1,55 @@
-#include "Common/DrcdClient.h"
-#include "Common/DrcdColorTest.h"
+#include "Common/BaristaAppHook.h"
+#include "Common/BaristaAppHookColorTest.h"
 #include "Cemu/Logging/CemuLogging.h"
 #include <atomic>
 #include <chrono>
 #include <cstdlib>
 #include <memory>
+#include <string>
 #include <thread>
 
 #if BOOST_OS_LINUX
-#include "drc_ipc/media_bridge.h"
+#include "drc_ipc/app_hook.h"
+#include <unistd.h>
 namespace
 {
-std::atomic<std::shared_ptr<drc_ipc::MediaBridge>> s_bridge;
+std::atomic<std::shared_ptr<drc_ipc::AppHook>> s_bridge;
 std::atomic_bool s_gameActive{false};
 std::atomic_bool s_colorTest{false};
 std::jthread s_colorWorker;
+
+std::string SocketPath()
+{
+	if (const char* configured = std::getenv("BARISTA_MUG_SOCKET"); configured && *configured)
+		return configured;
+	return "/run/barista/media-" + std::to_string(static_cast<unsigned long>(geteuid())) + ".sock";
+}
 }
 #endif
 
-namespace DrcdClient
+namespace BaristaAppHook
 {
 void Initialize(std::vector<uint8> idleRgb, unsigned width, unsigned height)
 {
 #if BOOST_OS_LINUX
-	const char* path = std::getenv("CEMU_DRCD_SOCKET");
-	if (!path || !*path) return;
-	auto bridge = std::make_shared<drc_ipc::MediaBridge>(false);
+	const auto path = SocketPath();
+	auto bridge = std::make_shared<drc_ipc::AppHook>(false);
 	bridge->submit_rgb(std::move(idleRgb), width, height, true);
 	std::string error;
 	if (!bridge->start(path, error))
 	{
-		cemuLog_log(LogType::Force, "drcd client could not start: {}", error);
+		cemuLog_log(LogType::Force, "Barista AppHook client could not start: {}", error);
 		return;
 	}
 	bridge->set_active(s_gameActive);
 	s_bridge.store(bridge);
-	cemuLog_log(LogType::Force, "drcd client enabled: {} (pairing and Wi-Fi remain in drcd)", path);
-	const char* colorTest = std::getenv("CEMU_DRCD_COLOR_TEST");
+	cemuLog_log(LogType::Force, "Barista AppHook client enabled: {} (pairing and Wi-Fi remain in Barista)", path);
+	const char* colorTest = std::getenv("BARISTA_APPHOOK_COLOR_TEST");
 	if (colorTest && std::string_view(colorTest) == "1")
 	{
 		s_colorTest = true;
 		bridge->set_active(true);
-		cemuLog_log(LogType::Force, "drcd color test enabled: 10s black lead-in after IPC connection, 32s loop; no game needed");
+		cemuLog_log(LogType::Force, "Barista AppHook color test enabled: 10s black lead-in after IPC connection, 32s loop; no game needed");
 		s_colorWorker = std::jthread([bridge](std::stop_token stop) {
 			using Clock = std::chrono::steady_clock;
 			auto origin = Clock::time_point{};
@@ -60,21 +68,21 @@ void Initialize(std::vector<uint8> idleRgb, unsigned width, unsigned height)
 					if (origin == Clock::time_point{})
 					{
 						origin = now;
-						cemuLog_log(LogType::Force, "drcd color test: connected; black lead-in begins");
+						cemuLog_log(LogType::Force, "Barista AppHook color test: connected; black lead-in begins");
 					}
 					const auto connectedUs = std::chrono::duration_cast<std::chrono::microseconds>(now - origin).count();
 					const uint64 elapsedUs = connectedUs > 10000000 ? connectedUs - 10000000 : 0;
-					const uint64 phase = elapsedUs / DrcdColorTest::PhaseUs;
+					const uint64 phase = elapsedUs / BaristaAppHookColorTest::PhaseUs;
 					if (connectedUs >= 10000000 && phase != previousPhase)
 					{
 						previousPhase = phase;
 						const auto unixUs = std::chrono::duration_cast<std::chrono::microseconds>(
 							std::chrono::system_clock::now().time_since_epoch()).count();
-						cemuLog_log(LogType::Force, "drcd color test: cycle={} phase={} source_us={} unix_us={} {}",
-							phase / DrcdColorTest::Phases.size(), phase % DrcdColorTest::Phases.size(),
-							elapsedUs, unixUs, DrcdColorTest::Phases[phase % DrcdColorTest::Phases.size()]);
+						cemuLog_log(LogType::Force, "Barista AppHook color test: cycle={} phase={} source_us={} unix_us={} {}",
+							phase / BaristaAppHookColorTest::Phases.size(), phase % BaristaAppHookColorTest::Phases.size(),
+							elapsedUs, unixUs, BaristaAppHookColorTest::Phases[phase % BaristaAppHookColorTest::Phases.size()]);
 					}
-					bridge->submit_rgb(DrcdColorTest::Render(elapsedUs), DrcdColorTest::Width, DrcdColorTest::Height);
+					bridge->submit_rgb(BaristaAppHookColorTest::Render(elapsedUs), BaristaAppHookColorTest::Width, BaristaAppHookColorTest::Height);
 				}
 				// Bound catch-up: never queue a burst of overdue diagnostic frames.
 				deadline = std::max(deadline + std::chrono::microseconds(16683), Clock::now());

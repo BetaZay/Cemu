@@ -1,5 +1,5 @@
 #include "Cafe/HW/Latte/Renderer/Vulkan/VulkanRenderer.h"
-#include "Common/DrcdClient.h"
+#include "Common/BaristaAppHook.h"
 #include "imgui/DrcdOverlay.h"
 #include "Cafe/HW/Latte/Renderer/Vulkan/VulkanAPI.h"
 #include "Cafe/HW/Latte/Renderer/Vulkan/LatteTextureVk.h"
@@ -1234,7 +1234,7 @@ void VulkanRenderer::HandleScreenshotRequest(LatteTextureView* texView, bool pad
 	if (formatValid)
 	{
 		if (m_drcdCapture)
-			DrcdClient::SubmitFrame(std::move(rgb_data), width, height);
+			BaristaAppHook::SubmitFrame(std::move(rgb_data), width, height);
 		else
 			SaveScreenshot(rgb_data, width, height, !padView);
 	}

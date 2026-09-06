@@ -7,7 +7,7 @@
 #include <imgui.h>
 #include "imgui/imgui_extension.h"
 #include "imgui/DrcdOverlay.h"
-#include "Common/DrcdClient.h"
+#include "Common/BaristaAppHook.h"
 #include "Cafe/OS/libs/swkbd/swkbd.h"
 #include <png.h>
 
@@ -27,7 +27,7 @@ void DrcdOverlay::PublishKeyboard(bool mainWindow)
 		wasPublished = false;
 		return;
 	}
-	if (!DrcdClient::WantsFrame()) return;
+	if (!BaristaAppHook::WantsFrame()) return;
 	auto* data = ImGui::GetDrawData();
 	if (!data) return;
 	unsigned char* alpha = nullptr;
@@ -39,7 +39,7 @@ void DrcdOverlay::PublishKeyboard(bool mainWindow)
 	{
 		if (!wasPublished) cemuLog_log(LogType::Force, "drcd keyboard overlay active");
 		wasPublished = true;
-		DrcdClient::SubmitFrame(std::move(rgb), 864, 480);
+		BaristaAppHook::SubmitFrame(std::move(rgb), 864, 480);
 	}
 }
 

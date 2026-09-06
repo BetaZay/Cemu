@@ -11,7 +11,7 @@
 #include "config/LaunchSettings.h"
 #include "wxgui/GettingStartedDialog.h"
 #include "input/InputManager.h"
-#include "Common/DrcdClient.h"
+#include "Common/BaristaAppHook.h"
 #include "resource/embedded/resources.h"
 #include "input/api/SDL/SDLControllerProvider.h"
 #include "wxgui/helpers/wxHelpers.h"
@@ -380,8 +380,8 @@ bool CemuApp::OnInit()
 
 	SetTopWindow(m_mainFrame);
 	m_mainFrame->Show();
+	// The connector uses Barista's default per-user socket unless explicitly overridden.
 	// Reuse Cemu's existing logo asset; no external asset path or daemon privilege.
-	if (std::getenv("CEMU_DRCD_SOCKET"))
 	{
 		wxImage logo = wxBitmap(wxICON(M_WND_ICON128)).ConvertToImage().Scale(256, 256, wxIMAGE_QUALITY_HIGH);
 		std::vector<uint8> canvas(864 * 480 * 3, 24);
@@ -394,7 +394,7 @@ bool CemuApp::OnInit()
 					const size_t dst = ((y + 112) * 864 + x + 304) * 3;
 					std::copy_n(logo.GetData() + src, 3, canvas.data() + dst);
 				}
-		DrcdClient::Initialize(std::move(canvas), 864, 480);
+		BaristaAppHook::Initialize(std::move(canvas), 864, 480);
 	}
 
 #if ( BOOST_OS_LINUX || BOOST_OS_BSD ) && HAS_WAYLAND
@@ -423,7 +423,7 @@ bool CemuApp::OnInit()
 
 int CemuApp::OnExit()
 {
-	DrcdClient::Shutdown();
+	BaristaAppHook::Shutdown();
 #if BOOST_OS_MACOS
 	if (m_sdlEventPumpTimer)
 	{

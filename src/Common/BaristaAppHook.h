@@ -2,7 +2,7 @@
 #include <array>
 #include <span>
 #include <vector>
-namespace DrcdClient
+namespace BaristaAppHook
 {
 void Initialize(std::vector<uint8> idleRgb, unsigned width, unsigned height);
 void Shutdown();

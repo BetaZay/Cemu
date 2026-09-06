@@ -75,18 +75,20 @@ cmake --build build
 
 #### Physical GamePad through drcd (Linux)
 
-The physical GamePad integration now uses the sibling `drc-project` daemon.
+This prototype branch's physical GamePad integration uses the sibling `Barista` daemon.
 Cemu links only its local IPC client library; it no longer builds hostapd/DHCP
-helpers or performs pairing/network setup. Override `CEMU_DRCD_PROJECT_DIR` if
-the daemon project is located elsewhere. See
-[Cemu/drcd integration](../drc-project/docs/cemu-integration.md) for launch
-commands, controls, and current GPU-readback limitations. Run Cemu unprivileged.
+helpers or performs pairing/network setup. Override `BARISTA_APPHOOK_PROJECT_DIR` if
+the Barista project is located elsewhere. See Barista's `README.md` and
+`COMPILING.md` for setup and packaging details. Run Cemu unprivileged. The client
+automatically uses Barista's default per-user endpoint,
+`/run/barista/media-<uid>.sock`; `BARISTA_MUG_SOCKET` remains an optional override
+for development.
 
 For a physical GamePad color-transition diagnostic, close any running Cemu and
 start it from the workspace root with:
 
 ```sh
-env CEMU_DRCD_SOCKET=/tmp/drcd-media.sock CEMU_DRCD_COLOR_TEST=1 ./Cemu/bin/Cemu_debug
+env BARISTA_APPHOOK_COLOR_TEST=1 ./Cemu/bin/Cemu_debug
 ```
 
 No game is needed. This replaces only the physical GamePad's bridge source,
@@ -101,7 +103,7 @@ times, not on-air timestamps. Frames are generated at approximately 59.94Hz,
 without a backlog of missed frames.
 
 Keep the existing drcd capture/MCS test running in another terminal. For example,
-from `drc-project`:
+from `Barista`:
 
 ```sh
 sudo python scripts/test-wifi-rate.py 5 /tmp/drcd-cemu-colors.pcap --baseline-seconds 5 --seconds 120
@@ -112,13 +114,13 @@ after `mcs5_start`. No Mac capture is required. This mode does not force IDRs or
 change drcd's encoder, TSF, PCM packetization or recovery settings; it establishes
 a repeatable baseline before any keyframe-policy comparison. Game audio and game
 scanout are suppressed in diagnostic mode. Restart Cemu without
-`CEMU_DRCD_COLOR_TEST` to restore normal logo/game output.
+`BARISTA_APPHOOK_COLOR_TEST` to restore normal logo/game output.
 
 Offline pattern checks:
 
 ```sh
-cmake --build Cemu/build --target CemuDrcdColorTestTests --parallel 4
-./Cemu/build/src/Common/CemuDrcdColorTestTests
+cmake --build Cemu/build --target CemuBaristaAppHookColorTestTests --parallel 4
+./Cemu/build/src/Common/CemuBaristaAppHookColorTestTests
 ```
 
 #### GCC

@@ -5,7 +5,7 @@
 #include <vector>
 
 // Pure, time-indexed source pattern; no decoder or transport settings change.
-namespace DrcdColorTest
+namespace BaristaAppHookColorTest
 {
 // Match Cemu's base types without importing emulator state into this pure source.
 using uint8 = std::uint8_t;
