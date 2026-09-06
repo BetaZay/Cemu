@@ -9,6 +9,7 @@
 #include <thread>
 
 #if BOOST_OS_LINUX
+#include <csignal>
 #include <poll.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -18,7 +19,54 @@
 namespace {
 using Clock = std::chrono::steady_clock;
 constexpr size_t chunk = 16384, max_audio = 9600, frame_bytes = 864 * 480 * 3 / 2;
-enum Type : uint32 { Video = 1, Idle = 2, Active = 3, Pcm = 4, Input = 5 };
+enum Type : uint32 { Video = 1, Idle = 2, Active = 3, Pcm = 4, Input = 5, Reject = 6 };
+
+struct LockInfo
+{
+	bool locked = false;
+	uint32 pid = 0;
+	std::string app;
+	uint64 lastSeen = 0;
+};
+
+LockInfo ReadLockFile(const std::string& lockPath)
+{
+	LockInfo info;
+	FILE* f = fopen(lockPath.c_str(), "re");
+	if (!f) return info;
+	char line[256];
+	while (fgets(line, sizeof(line), f))
+	{
+		std::string_view sv(line);
+		while (!sv.empty() && (sv.back() == '\r' || sv.back() == '\n' || sv.back() == ' '))
+			sv.remove_suffix(1);
+		auto eq = sv.find('=');
+		if (eq == std::string_view::npos) continue;
+		auto key = sv.substr(0, eq);
+		auto val = sv.substr(eq + 1);
+		if (key == "pid")
+		{
+			char* end = nullptr;
+			info.pid = static_cast<uint32>(strtoul(std::string(val).c_str(), &end, 10));
+		}
+		else if (key == "app" || key == "name")
+		{
+			info.app = std::string(val);
+		}
+		else if (key == "last_seen")
+		{
+			char* end = nullptr;
+			info.lastSeen = strtoull(std::string(val).c_str(), &end, 10);
+		}
+	}
+	fclose(f);
+	if (info.pid > 0)
+	{
+		if (kill(static_cast<pid_t>(info.pid), 0) == 0 || errno == EPERM)
+			info.locked = true;
+	}
+	return info;
+}
 void put(uint8* p, uint32 v) { for (unsigned i = 0; i < 4; i++) p[i] = v >> (8 * i); }
 uint32 get(const uint8* p) { return uint32(p[0]) | uint32(p[1]) << 8 | uint32(p[2]) << 16 | uint32(p[3]) << 24; }
 struct Rgb { std::vector<uint8> b; unsigned w = 0, h = 0; };
@@ -110,6 +158,11 @@ public:
 		if (input_reports_received == 0) return -1;
 		return std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - input_time).count();
 	}
+	std::string get_rejection_reason() const
+	{
+		std::lock_guard l(m);
+		return rejection_reason;
+	}
 	const std::string& get_path() const { return path; }
 
 private:
@@ -122,7 +175,16 @@ private:
 		put(p.data() + 8, id);
 		put(p.data() + 12, off);
 		std::copy(d.begin(), d.end(), p.begin() + 16);
-		return send(fd, p.data(), d.size() + 16, MSG_DONTWAIT | MSG_NOSIGNAL) == ssize_t(d.size() + 16);
+		const auto deadline = Clock::now() + std::chrono::milliseconds(100);
+		do
+		{
+			const auto n = send(fd, p.data(), d.size() + 16, MSG_DONTWAIT | MSG_NOSIGNAL);
+			if (n == ssize_t(d.size() + 16)) return true;
+			if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) return false;
+			pollfd q{fd, POLLOUT, 0};
+			poll(&q, 1, 2);
+		} while (!stopping && Clock::now() < deadline);
+		return false;
 	}
 	bool sendf(int fd, Type t, uint32 id, const std::vector<uint8>& f)
 	{
@@ -132,6 +194,10 @@ private:
 	}
 	void session(int fd)
 	{
+		{
+			std::lock_guard z(m);
+			rejection_reason.clear();
+		}
 		linked = true;
 		uint32 id = 0;
 		uint64 sent_logo = 0;
@@ -174,16 +240,34 @@ private:
 			}
 			pollfd q{fd, POLLIN, 0};
 			poll(&q, 1, 2);
-			if (q.revents & (POLLERR | POLLHUP | POLLNVAL)) break;
-			std::array<uint8, 16 + chunk> b;
-			auto n = recv(fd, b.data(), b.size(), MSG_DONTWAIT | MSG_TRUNC);
-			if (n >= 0)
+			if (q.revents & (POLLERR | POLLNVAL)) break;
+			if (q.revents & (POLLIN | POLLHUP))
 			{
-				if (n != 144 || get(b.data()) != 0x3147554d || get(b.data() + 4) != Input) break;
-				std::lock_guard z(m);
-				std::copy_n(b.data() + 16, 128, in.begin());
-				input_time = Clock::now();
-				input_reports_received++;
+				std::array<uint8, 16 + chunk> b;
+				auto n = recv(fd, b.data(), b.size(), MSG_DONTWAIT | MSG_TRUNC);
+				if (n >= 16 && get(b.data()) == 0x3147554d)
+				{
+					const auto type = get(b.data() + 4);
+					if (type == Reject)
+					{
+						std::string reason(reinterpret_cast<const char*>(b.data() + 16), n - 16);
+						std::lock_guard z(m);
+						rejection_reason = reason;
+						cemuLog_log(LogType::Force, "Barista AppHook connection rejected: {}", reason);
+						break;
+					}
+					if (type == Input && n == 144)
+					{
+						std::lock_guard z(m);
+						std::copy_n(b.data() + 16, 128, in.begin());
+						input_time = Clock::now();
+						input_reports_received++;
+					}
+				}
+				else if (n <= 0 && (q.revents & POLLHUP))
+				{
+					break;
+				}
 			}
 		}
 		linked = false;
@@ -193,12 +277,42 @@ private:
 	{
 		while (!stopping)
 		{
+			const auto lock = ReadLockFile(path + ".lock");
+			if (lock.locked && lock.pid != static_cast<uint32>(getpid()))
+			{
+				std::lock_guard l(m);
+				rejection_reason = "Busy: already connected to " + (lock.app.empty() ? "another app" : lock.app) + " (PID " + std::to_string(lock.pid) + ")";
+			}
+
 			int fd = socket(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
+			if (fd >= 0)
+			{
+				int buf_size = 2 * 1024 * 1024;
+				setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &buf_size, sizeof(buf_size));
+				setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &buf_size, sizeof(buf_size));
+			}
 			sockaddr_un a{};
 			a.sun_family = AF_UNIX;
 			std::memcpy(a.sun_path, path.c_str(), path.size() + 1);
 			if (fd >= 0 && connect(fd, reinterpret_cast<sockaddr*>(&a), sizeof(a)) == 0)
 			{
+				{
+					std::lock_guard l(m);
+					if (!logo.b.empty())
+					{
+						auto yuv = i420(logo);
+						if (yuv.size() == frame_bytes)
+						{
+							std::string logo_path = path + ".idle.i420";
+							FILE* f = fopen(logo_path.c_str(), "wb");
+							if (f)
+							{
+								fwrite(yuv.data(), 1, yuv.size(), f);
+								fclose(f);
+							}
+						}
+					}
+				}
 				session(fd);
 				continue;
 			}
@@ -211,6 +325,7 @@ private:
 	std::atomic<uint64> frames_sent = 0, audio_chunks_sent = 0, input_reports_received = 0;
 	std::jthread worker;
 	std::string path;
+	std::string rejection_reason;
 	mutable std::mutex m;
 	Rgb pending, logo;
 	std::deque<sint16> audio;
@@ -283,6 +398,12 @@ Status GetStatus()
 		struct stat st{};
 		if (stat(s.effectiveSocketPath.c_str(), &st) == 0)
 			s.socketFileExists = true;
+
+		const auto lockInfo = ReadLockFile(s.effectiveSocketPath + ".lock");
+		if (lockInfo.locked && lockInfo.pid != static_cast<uint32>(getpid()))
+		{
+			s.lockHolder = "Locked by " + (lockInfo.app.empty() ? "another app" : lockInfo.app) + " (PID " + std::to_string(lockInfo.pid) + ")";
+		}
 	}
 
 	if (auto b = bridge.load())
@@ -292,6 +413,7 @@ Status GetStatus()
 		s.audioChunksSent = b->get_audio_chunks_sent();
 		s.inputReportsReceived = b->get_input_reports_received();
 		s.lastInputMsAgo = b->get_last_input_ms();
+		s.rejectionReason = b->get_rejection_reason();
 	}
 #endif
 	return s;

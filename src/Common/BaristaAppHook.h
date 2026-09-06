@@ -18,6 +18,8 @@ struct Status
 	uint64 audioChunksSent = 0;
 	uint64 inputReportsReceived = 0;
 	sint64 lastInputMsAgo = -1;
+	std::string rejectionReason;
+	std::string lockHolder;
 };
 
 void Initialize(std::vector<uint8> idleRgb, unsigned width, unsigned height, const std::string& customSocketPath = "", bool enabled = true);

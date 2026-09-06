@@ -2692,20 +2692,44 @@ void GeneralSettings2::UpdateBaristaStatus()
 	}
 	else
 	{
-		m_barista_status_conn->SetLabel(_("Disconnected"));
-		m_barista_status_conn->SetForegroundColour(wxColour(200, 0, 0));
+		if (!status.rejectionReason.empty())
+		{
+			m_barista_status_conn->SetLabel(formatWxString(_("Connection rejected ({})"), wxString::FromUTF8(status.rejectionReason)));
+			m_barista_status_conn->SetForegroundColour(wxColour(220, 50, 50));
+		}
+		else if (!status.lockHolder.empty())
+		{
+			m_barista_status_conn->SetLabel(formatWxString(_("Socket busy ({})"), wxString::FromUTF8(status.lockHolder)));
+			m_barista_status_conn->SetForegroundColour(wxColour(200, 120, 0));
+		}
+		else
+		{
+			m_barista_status_conn->SetLabel(_("Disconnected"));
+			m_barista_status_conn->SetForegroundColour(wxColour(200, 0, 0));
+		}
 
 		std::error_code ec;
 		bool fileExists = !effectivePath.empty() && fs::exists(wxHelper::MakeFSPath(effectivePath), ec);
 
 		if (effectivePath.empty())
 			m_barista_status_sock_file->SetLabel(_("Not configured"));
+		else if (!status.lockHolder.empty())
+			m_barista_status_sock_file->SetLabel(formatWxString(_("Socket active ({}) [{}]"), wxString::FromUTF8(effectivePath), wxString::FromUTF8(status.lockHolder)));
 		else if (fileExists)
 			m_barista_status_sock_file->SetLabel(formatWxString(_("Found socket, waiting for connection ({})"), wxString::FromUTF8(effectivePath)));
 		else
 			m_barista_status_sock_file->SetLabel(formatWxString(_("Socket file not found ({})"), wxString::FromUTF8(effectivePath)));
 
-		m_barista_status_session->SetLabel(_("Inactive"));
+		if (!status.rejectionReason.empty() || !status.lockHolder.empty())
+		{
+			const std::string reason = !status.rejectionReason.empty() ? status.rejectionReason : status.lockHolder;
+			m_barista_status_session->SetLabel(formatWxString(_("Blocked ({})"), wxString::FromUTF8(reason)));
+		}
+		else
+		{
+			m_barista_status_session->SetLabel(_("Inactive"));
+		}
+
 		m_barista_status_input->SetLabel(_("No connection"));
 		m_barista_status_stats->SetLabel(formatWxString(_("Frames sent: {} | Audio chunks: {} | Input reports: {}"),
 			status.framesSent, status.audioChunksSent, status.inputReportsReceived));
