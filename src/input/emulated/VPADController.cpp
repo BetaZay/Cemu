@@ -1,5 +1,6 @@
 #include "input/emulated/VPADController.h"
 #include "input/api/Controller.h"
+#include "Common/BaristaAppHook.h"
 #ifdef HAS_SDL
 #include "input/api/SDL/SDLController.h"
 #endif
@@ -229,6 +230,18 @@ void VPADController::update_touch(VPADStatus_t& status)
 			(uint16)(relative_mouse_pos.x * 3883.0 + 92.0), (uint16)(4095.0 - relative_mouse_pos.y * 3694.0 - 254.0),
 			status.tpData.x.value(), status.tpData.y.value(), status.tpData.x.bevalue(), status.tpData.y.bevalue()
 		);*/
+	}
+	else
+	{
+		float touch_x, touch_y;
+		if (BaristaAppHook::ReadTouch(touch_x, touch_y))
+		{
+			status.tpData.touch = kTpTouchOn;
+			status.tpData.validity = kTpValid;
+			status.tpData.x = (uint16)(touch_x * 3883.0f + 92.0f);
+			status.tpData.y = (uint16)(4095.0f - touch_y * 3694.0f - 254.0f);
+			m_last_touch_position = glm::ivec2{status.tpData.x, status.tpData.y};
+		}
 	}
 
 	status.tpProcessed1 = status.tpData;

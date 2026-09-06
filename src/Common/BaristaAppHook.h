@@ -29,6 +29,8 @@ bool WantsFrame();
 void SubmitFrame(std::vector<uint8> rgb, unsigned width, unsigned height);
 void SubmitAudio(std::span<const sint16> samples, unsigned channels);
 bool ReadInput(std::array<uint8, 128>& report);
+// Reads one GamePad touchscreen contact in normalized screen coordinates.
+bool ReadTouch(float& x, float& y);
 
 std::string GetDefaultSocketPath();
 std::string GetEffectiveSocketPath();

@@ -576,4 +576,33 @@ bool ReadInput(std::array<uint8, 128>& r)
 	return false;
 }
 
+bool ReadTouch(float& x, float& y)
+{
+	std::array<uint8, 128> report{};
+	if (!ReadInput(report)) return false;
+
+	// The GamePad supplies ten filtered touch samples in the DRC input report.
+	const int pressure = ((report[37] >> 4) & 7) |
+		(((report[39] >> 4) & 7) << 3) |
+		(((report[41] >> 4) & 7) << 6) |
+		(((report[43] >> 4) & 7) << 9);
+	int raw_x = 0;
+	int raw_y = 0;
+	for (int i = 0; i < 10; ++i)
+	{
+		const int offset = 36 + i * 4;
+		raw_x += ((report[offset + 1] & 0x0f) << 8) | report[offset];
+		raw_y += ((report[offset + 3] & 0x0f) << 8) | report[offset + 2];
+	}
+	if (pressure == 0) return false;
+
+	raw_x /= 10;
+	raw_y /= 10;
+	const float gamepad_x = std::clamp(-23.1097f + raw_x * 0.2210755f, 0.0f, 854.0f);
+	const float gamepad_y = std::clamp(507.639f - raw_y * 0.12772f, 0.0f, 480.0f);
+	x = gamepad_x / 854.0f;
+	y = gamepad_y / 480.0f;
+	return true;
+}
+
 }
