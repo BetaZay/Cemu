@@ -14,6 +14,8 @@ class wxSlider;
 class wxSpinCtrl;
 class wxSpinCtrlDouble;
 class wxStaticText;
+class wxTimer;
+class wxTimerEvent;
 
 wxDECLARE_EVENT(wxEVT_ACCOUNTLIST_REFRESH, wxCommandEvent);
 
@@ -46,6 +48,7 @@ private:
 	wxPanel* AddOverlayPage(wxNotebook* notebook);
 	wxPanel* AddAccountPage(wxNotebook* notebook);
 	wxPanel* AddDebugPage(wxNotebook* notebook);
+	wxPanel* AddBaristaPage(wxNotebook* notebook);
 
 	// General
 	wxChoice * m_language;
@@ -140,4 +143,25 @@ private:
 	void UpdateOnlineAccounts();
 	void HandleGraphicsApiSelection();
 	void ApplyConfig();
+
+	// Barista
+	void UpdateBaristaStatus();
+	void OnBaristaSocketBrowse(wxCommandEvent& event);
+	void OnBaristaSocketDefault(wxCommandEvent& event);
+	void OnBaristaReconnect(wxCommandEvent& event);
+	void OnBaristaRefresh(wxCommandEvent& event);
+	void OnBaristaTimer(wxTimerEvent& event);
+
+	wxCheckBox* m_barista_enabled = nullptr;
+	wxTextCtrl* m_barista_socket_path = nullptr;
+	wxButton* m_barista_browse_button = nullptr;
+	wxButton* m_barista_default_button = nullptr;
+	wxButton* m_barista_reconnect_button = nullptr;
+	wxButton* m_barista_refresh_button = nullptr;
+	wxStaticText* m_barista_status_conn = nullptr;
+	wxStaticText* m_barista_status_sock_file = nullptr;
+	wxStaticText* m_barista_status_session = nullptr;
+	wxStaticText* m_barista_status_input = nullptr;
+	wxStaticText* m_barista_status_stats = nullptr;
+	wxTimer* m_barista_timer = nullptr;
 };

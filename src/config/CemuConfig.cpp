@@ -290,6 +290,11 @@ XMLConfigParser CemuConfig::Load(XMLConfigParser& parser)
 	emulated_usb_devices.emulate_infinity_base = usbdevices.get("EmulateInfinityBase", emulated_usb_devices.emulate_infinity_base);
 	emulated_usb_devices.emulate_dimensions_toypad = usbdevices.get("EmulateDimensionsToypad", emulated_usb_devices.emulate_dimensions_toypad);
 
+	// barista
+	auto barista_parser = parser.get("Barista");
+	barista.enabled = barista_parser.get("enabled", barista.enabled);
+	barista.socket_path = barista_parser.get("socket_path", barista.socket_path);
+
 	return parser;
 }
 
@@ -453,6 +458,11 @@ XMLConfigParser CemuConfig::Save(XMLConfigParser& parser)
 	usbdevices.set("EmulateSkylanderPortal", emulated_usb_devices.emulate_skylander_portal.GetValue());
 	usbdevices.set("EmulateInfinityBase", emulated_usb_devices.emulate_infinity_base.GetValue());
 	usbdevices.set("EmulateDimensionsToypad", emulated_usb_devices.emulate_dimensions_toypad.GetValue());
+
+	// barista
+	auto barista_node = config.set("Barista");
+	barista_node.set("enabled", barista.enabled.GetValue());
+	barista_node.set("socket_path", barista.socket_path.GetValue().c_str());
 
 	return config;
 }

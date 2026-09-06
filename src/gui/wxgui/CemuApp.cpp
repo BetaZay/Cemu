@@ -394,7 +394,8 @@ bool CemuApp::OnInit()
 					const size_t dst = ((y + 112) * 864 + x + 304) * 3;
 					std::copy_n(logo.GetData() + src, 3, canvas.data() + dst);
 				}
-		BaristaAppHook::Initialize(std::move(canvas), 864, 480);
+		const auto& cemuConfig = GetConfig();
+		BaristaAppHook::Initialize(std::move(canvas), 864, 480, cemuConfig.barista.socket_path.GetValue(), cemuConfig.barista.enabled.GetValue());
 	}
 
 #if ( BOOST_OS_LINUX || BOOST_OS_BSD ) && HAS_WAYLAND

@@ -13,7 +13,11 @@
 #include <wx/cshelp.h>
 #include <wx/textctrl.h>
 #include <wx/textdlg.h>
+#include <wx/filedlg.h>
+#include <wx/timer.h>
 #include <wx/hyperlink.h>
+
+#include "Common/BaristaAppHook.h"
 
 #include "config/CemuConfig.h"
 #include "config/NetworkSettings.h"
@@ -1076,6 +1080,132 @@ wxPanel* GeneralSettings2::AddDebugPage(wxNotebook* notebook)
 	return panel;
 }
 
+wxPanel* GeneralSettings2::AddBaristaPage(wxNotebook* notebook)
+{
+	auto* panel = new wxPanel(notebook, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
+	auto* main_sizer = new wxBoxSizer(wxVERTICAL);
+
+	// Box 1: About Barista
+	{
+		auto* box = new wxStaticBox(panel, wxID_ANY, _("About Barista"));
+		auto* box_sizer = new wxStaticBoxSizer(box, wxVERTICAL);
+
+		auto* desc = new wxStaticText(box, wxID_ANY, _("Barista is a Linux companion application that connects a physical Wii U GamePad to your PC wirelessly.\nIt manages GamePad pairing, 5 GHz Wi-Fi access point streaming, and input reception."));
+		box_sizer->Add(desc, 0, wxALL, 5);
+
+		auto* link = new wxHyperlinkCtrl(box, wxID_ANY, _("Download Barista on GitHub"), "https://github.com/BetaZay/Barista");
+		box_sizer->Add(link, 0, wxLEFT | wxRIGHT | wxBOTTOM, 5);
+
+		main_sizer->Add(box_sizer, 0, wxEXPAND | wxALL, 5);
+	}
+
+	// Box 2: Integration
+	{
+		auto* box = new wxStaticBox(panel, wxID_ANY, _("GamePad Bridge Integration"));
+		auto* box_sizer = new wxStaticBoxSizer(box, wxVERTICAL);
+
+		m_barista_enabled = new wxCheckBox(box, wxID_ANY, _("Enable Barista GamePad bridge"));
+		m_barista_enabled->SetToolTip(_("Connects Cemu to the Barista daemon via Unix domain socket for GamePad video, audio, and input streaming."));
+		m_barista_enabled->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
+			UpdateBaristaStatus();
+		});
+		box_sizer->Add(m_barista_enabled, 0, wxALL, 5);
+
+		main_sizer->Add(box_sizer, 0, wxEXPAND | wxALL, 5);
+	}
+
+	// Box 2: Socket Location
+	{
+		auto* box = new wxStaticBox(panel, wxID_ANY, _("Socket Location"));
+		auto* box_sizer = new wxStaticBoxSizer(box, wxVERTICAL);
+
+		box_sizer->Add(new wxStaticText(box, wxID_ANY, _("Specify the Unix domain socket path used to communicate with the Barista daemon.\nLeave empty to use the default per-user socket.")), 0, wxALL, 5);
+
+		auto* path_sizer = new wxBoxSizer(wxHORIZONTAL);
+		m_barista_socket_path = new wxTextCtrl(box, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize);
+		m_barista_socket_path->SetMinSize(wxSize(260, -1));
+		m_barista_socket_path->SetToolTip(_("Unix domain socket path (e.g. /run/barista/media-1000.sock)."));
+		m_barista_socket_path->Bind(wxEVT_TEXT, [this](wxCommandEvent&) {
+			UpdateBaristaStatus();
+		});
+		path_sizer->Add(m_barista_socket_path, 1, wxALL | wxEXPAND, 5);
+
+		m_barista_browse_button = new wxButton(box, wxID_ANY, _("Browse..."));
+		m_barista_browse_button->Bind(wxEVT_BUTTON, &GeneralSettings2::OnBaristaSocketBrowse, this);
+		path_sizer->Add(m_barista_browse_button, 0, wxALL, 5);
+
+		m_barista_default_button = new wxButton(box, wxID_ANY, _("Reset to default"));
+		m_barista_default_button->Bind(wxEVT_BUTTON, &GeneralSettings2::OnBaristaSocketDefault, this);
+		path_sizer->Add(m_barista_default_button, 0, wxALL, 5);
+
+		box_sizer->Add(path_sizer, 0, wxEXPAND, 5);
+
+		const auto defaultPath = BaristaAppHook::GetDefaultSocketPath();
+		auto* hintText = new wxStaticText(box, wxID_ANY, formatWxString(_("Default socket: {}"), wxString::FromUTF8(defaultPath)));
+		box_sizer->Add(hintText, 0, wxALL, 5);
+
+		main_sizer->Add(box_sizer, 0, wxEXPAND | wxALL, 5);
+	}
+
+	// Box 3: Status & Diagnostics
+	{
+		auto* box = new wxStaticBox(panel, wxID_ANY, _("Status & Diagnostics"));
+		auto* box_sizer = new wxStaticBoxSizer(box, wxVERTICAL);
+
+		auto* grid = new wxFlexGridSizer(0, 2, 6, 12);
+		grid->AddGrowableCol(1, 1);
+
+		grid->Add(new wxStaticText(box, wxID_ANY, _("Connection:")), 0, wxALIGN_CENTER_VERTICAL);
+		m_barista_status_conn = new wxStaticText(box, wxID_ANY, _("Checking..."));
+		grid->Add(m_barista_status_conn, 0, wxALIGN_CENTER_VERTICAL | wxEXPAND);
+
+		grid->Add(new wxStaticText(box, wxID_ANY, _("Socket file:")), 0, wxALIGN_CENTER_VERTICAL);
+		m_barista_status_sock_file = new wxStaticText(box, wxID_ANY, _("-"));
+		grid->Add(m_barista_status_sock_file, 0, wxALIGN_CENTER_VERTICAL | wxEXPAND);
+
+		grid->Add(new wxStaticText(box, wxID_ANY, _("Session state:")), 0, wxALIGN_CENTER_VERTICAL);
+		m_barista_status_session = new wxStaticText(box, wxID_ANY, _("-"));
+		grid->Add(m_barista_status_session, 0, wxALIGN_CENTER_VERTICAL | wxEXPAND);
+
+		grid->Add(new wxStaticText(box, wxID_ANY, _("GamePad input:")), 0, wxALIGN_CENTER_VERTICAL);
+		m_barista_status_input = new wxStaticText(box, wxID_ANY, _("-"));
+		grid->Add(m_barista_status_input, 0, wxALIGN_CENTER_VERTICAL | wxEXPAND);
+
+		grid->Add(new wxStaticText(box, wxID_ANY, _("Statistics:")), 0, wxALIGN_CENTER_VERTICAL);
+		m_barista_status_stats = new wxStaticText(box, wxID_ANY, _("-"));
+		grid->Add(m_barista_status_stats, 0, wxALIGN_CENTER_VERTICAL | wxEXPAND);
+
+		box_sizer->Add(grid, 0, wxALL | wxEXPAND, 5);
+
+		auto* btn_sizer = new wxBoxSizer(wxHORIZONTAL);
+		m_barista_reconnect_button = new wxButton(box, wxID_ANY, _("Reconnect Now"));
+		m_barista_reconnect_button->Bind(wxEVT_BUTTON, &GeneralSettings2::OnBaristaReconnect, this);
+		m_barista_reconnect_button->SetToolTip(_("Immediately reconnect the socket client to Barista using the configured path."));
+		btn_sizer->Add(m_barista_reconnect_button, 0, wxALL, 5);
+
+		m_barista_refresh_button = new wxButton(box, wxID_ANY, _("Refresh Status"));
+		m_barista_refresh_button->Bind(wxEVT_BUTTON, &GeneralSettings2::OnBaristaRefresh, this);
+		btn_sizer->Add(m_barista_refresh_button, 0, wxALL, 5);
+
+		box_sizer->Add(btn_sizer, 0, wxALIGN_RIGHT | wxALL, 5);
+
+		main_sizer->Add(box_sizer, 0, wxEXPAND | wxALL, 5);
+	}
+
+#if !BOOST_OS_LINUX
+	auto* notice = new wxStaticText(panel, wxID_ANY, _("Note: The Barista GamePad bridge is only supported on Linux."));
+	main_sizer->Add(notice, 0, wxALL, 10);
+	m_barista_enabled->Disable();
+	m_barista_socket_path->Disable();
+	m_barista_browse_button->Disable();
+	m_barista_default_button->Disable();
+	m_barista_reconnect_button->Disable();
+#endif
+
+	panel->SetSizerAndFit(main_sizer);
+	return panel;
+}
+
 GeneralSettings2::GeneralSettings2(wxWindow* parent, bool game_launched)
 	: wxDialog(parent, wxID_ANY, _("General settings"), wxDefaultPosition, wxDefaultSize, wxCLOSE_BOX | wxCLIP_CHILDREN | wxCAPTION | wxRESIZE_BORDER), m_game_launched(game_launched)
 {
@@ -1090,6 +1220,11 @@ GeneralSettings2::GeneralSettings2(wxWindow* parent, bool game_launched)
 	notebook->AddPage(AddOverlayPage(notebook), _("Overlay"));
 	notebook->AddPage(AddAccountPage(notebook), _("Account"));
 	notebook->AddPage(AddDebugPage(notebook), _("Debug"));
+	notebook->AddPage(AddBaristaPage(notebook), _("Barista"));
+
+	m_barista_timer = new wxTimer(this);
+	Bind(wxEVT_TIMER, &GeneralSettings2::OnBaristaTimer, this, m_barista_timer->GetId());
+	m_barista_timer->Start(1000);
 
 	Bind(wxEVT_CLOSE_WINDOW, &GeneralSettings2::OnClose, this);
 
@@ -1302,11 +1437,26 @@ void GeneralSettings2::StoreConfig()
 	config.framebuffer_fetch = m_framebuffer_fetch->IsChecked();
 #endif
 
+	// barista
+	if (m_barista_enabled)
+		config.barista.enabled = m_barista_enabled->IsChecked();
+	if (m_barista_socket_path)
+		config.barista.socket_path = m_barista_socket_path->GetValue().utf8_string();
+
+	BaristaAppHook::Reconfigure(config.barista.socket_path.GetValue(), config.barista.enabled.GetValue());
+
 	GetConfigHandle().Save();
 }
 
 GeneralSettings2::~GeneralSettings2()
 {
+	if (m_barista_timer)
+	{
+		m_barista_timer->Stop();
+		Unbind(wxEVT_TIMER, &GeneralSettings2::OnBaristaTimer, this, m_barista_timer->GetId());
+		delete m_barista_timer;
+		m_barista_timer = nullptr;
+	}
 	Unbind(wxEVT_CLOSE_WINDOW, &GeneralSettings2::OnClose, this);
 }
 
@@ -2061,6 +2211,13 @@ void GeneralSettings2::ApplyConfig()
 	m_gpu_capture_dir->SetValue(wxString::FromUTF8(config.gpu_capture_dir.GetValue()));
 	m_framebuffer_fetch->SetValue(config.framebuffer_fetch);
 #endif
+
+	// barista
+	if (m_barista_enabled)
+		m_barista_enabled->SetValue(config.barista.enabled.GetValue());
+	if (m_barista_socket_path)
+		m_barista_socket_path->SetValue(wxString::FromUTF8(config.barista.socket_path.GetValue()));
+	UpdateBaristaStatus();
 }
 
 void GeneralSettings2::OnAudioAPISelected(wxCommandEvent& event)
@@ -2482,4 +2639,126 @@ wxString GeneralSettings2::GetOnlineAccountErrorMessage(OnlineAccountError error
 		default:
 			return "no error";
 	}
+}
+
+void GeneralSettings2::UpdateBaristaStatus()
+{
+	if (!m_barista_status_conn)
+		return;
+
+#if !BOOST_OS_LINUX
+	m_barista_status_conn->SetLabel(_("Unsupported (Linux only)"));
+	m_barista_status_conn->SetForegroundColour(wxColour(128, 128, 128));
+	m_barista_status_sock_file->SetLabel(_("Not available on this platform"));
+	m_barista_status_session->SetLabel(_("Inactive"));
+	m_barista_status_input->SetLabel(_("No GamePad bridge"));
+	m_barista_status_stats->SetLabel(_("-"));
+#else
+	const auto status = BaristaAppHook::GetStatus();
+	const bool isEnabled = m_barista_enabled ? m_barista_enabled->IsChecked() : status.enabled;
+	const wxString currentPathText = m_barista_socket_path ? m_barista_socket_path->GetValue() : wxString();
+	const std::string effectivePath = currentPathText.empty() ? status.effectiveSocketPath : currentPathText.utf8_string();
+
+	if (!isEnabled)
+	{
+		m_barista_status_conn->SetLabel(_("Disabled"));
+		m_barista_status_conn->SetForegroundColour(wxColour(128, 128, 128));
+		m_barista_status_sock_file->SetLabel(effectivePath.empty() ? _("Not configured") : wxString::FromUTF8(effectivePath));
+		m_barista_status_session->SetLabel(_("Inactive (disabled)"));
+		m_barista_status_input->SetLabel(_("Disabled"));
+		m_barista_status_stats->SetLabel(_("-"));
+	}
+	else if (status.connected)
+	{
+		m_barista_status_conn->SetLabel(_("Connected to Barista daemon"));
+		m_barista_status_conn->SetForegroundColour(wxColour(0, 160, 0));
+
+		m_barista_status_sock_file->SetLabel(formatWxString(_("Connected ({})"), wxString::FromUTF8(status.effectiveSocketPath)));
+
+		if (status.gameActive)
+			m_barista_status_session->SetLabel(_("Active (streaming game video and audio to GamePad)"));
+		else
+			m_barista_status_session->SetLabel(_("Idle (displaying logo on GamePad)"));
+
+		if (status.lastInputMsAgo >= 0 && status.lastInputMsAgo < 2000)
+			m_barista_status_input->SetLabel(formatWxString(_("Receiving reports (last report {} ms ago)"), status.lastInputMsAgo));
+		else if (status.inputReportsReceived > 0)
+			m_barista_status_input->SetLabel(formatWxString(_("Idle (last report {} ms ago)"), status.lastInputMsAgo));
+		else
+			m_barista_status_input->SetLabel(_("Waiting for GamePad input..."));
+
+		m_barista_status_stats->SetLabel(formatWxString(_("Frames sent: {} | Audio chunks: {} | Input reports: {}"),
+			status.framesSent, status.audioChunksSent, status.inputReportsReceived));
+	}
+	else
+	{
+		m_barista_status_conn->SetLabel(_("Disconnected"));
+		m_barista_status_conn->SetForegroundColour(wxColour(200, 0, 0));
+
+		std::error_code ec;
+		bool fileExists = !effectivePath.empty() && fs::exists(wxHelper::MakeFSPath(effectivePath), ec);
+
+		if (effectivePath.empty())
+			m_barista_status_sock_file->SetLabel(_("Not configured"));
+		else if (fileExists)
+			m_barista_status_sock_file->SetLabel(formatWxString(_("Found socket, waiting for connection ({})"), wxString::FromUTF8(effectivePath)));
+		else
+			m_barista_status_sock_file->SetLabel(formatWxString(_("Socket file not found ({})"), wxString::FromUTF8(effectivePath)));
+
+		m_barista_status_session->SetLabel(_("Inactive"));
+		m_barista_status_input->SetLabel(_("No connection"));
+		m_barista_status_stats->SetLabel(formatWxString(_("Frames sent: {} | Audio chunks: {} | Input reports: {}"),
+			status.framesSent, status.audioChunksSent, status.inputReportsReceived));
+	}
+
+	m_barista_status_conn->Refresh();
+#endif
+}
+
+void GeneralSettings2::OnBaristaSocketBrowse(wxCommandEvent& event)
+{
+	wxString defaultDir = "/run/barista";
+	wxString currentPath = m_barista_socket_path->GetValue();
+	if (!currentPath.empty())
+	{
+		fs::path p = wxHelper::MakeFSPath(currentPath);
+		if (p.has_parent_path())
+			defaultDir = wxHelper::FromPath(p.parent_path());
+	}
+
+	wxFileDialog openFileDialog(this, _("Select Barista socket file"), defaultDir, wxEmptyString,
+								_("Socket files (*.sock)|*.sock|All files (*.*)|*.*"),
+								wxFD_OPEN);
+	if (openFileDialog.ShowModal() == wxID_CANCEL)
+		return;
+
+	m_barista_socket_path->SetValue(openFileDialog.GetPath());
+	UpdateBaristaStatus();
+}
+
+void GeneralSettings2::OnBaristaSocketDefault(wxCommandEvent& event)
+{
+	m_barista_socket_path->SetValue(wxEmptyString);
+	UpdateBaristaStatus();
+}
+
+void GeneralSettings2::OnBaristaReconnect(wxCommandEvent& event)
+{
+	auto& config = GetConfig();
+	config.barista.enabled = m_barista_enabled->IsChecked();
+	config.barista.socket_path = m_barista_socket_path->GetValue().utf8_string();
+
+	BaristaAppHook::Reconfigure(config.barista.socket_path.GetValue(), config.barista.enabled.GetValue());
+	BaristaAppHook::Reconnect();
+	UpdateBaristaStatus();
+}
+
+void GeneralSettings2::OnBaristaRefresh(wxCommandEvent& event)
+{
+	UpdateBaristaStatus();
+}
+
+void GeneralSettings2::OnBaristaTimer(wxTimerEvent& event)
+{
+	UpdateBaristaStatus();
 }

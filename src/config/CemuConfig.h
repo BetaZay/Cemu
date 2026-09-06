@@ -536,6 +536,13 @@ struct CemuConfig
 		ConfigValue<bool> emulate_dimensions_toypad{false};
 	}emulated_usb_devices{};
 
+	// barista
+	struct
+	{
+		ConfigValue<bool> enabled{ true };
+		ConfigValue<std::string> socket_path{ "" };
+	} barista{};
+
 	static int AudioChannelsToNChannels(AudioChannels kStereo)
 	{
 		switch (kStereo)
