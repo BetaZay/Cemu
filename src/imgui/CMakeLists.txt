@@ -1,6 +1,8 @@
 add_library(DrcdOverlayRaster STATIC DrcdOverlay.cpp)
 target_include_directories(DrcdOverlayRaster PUBLIC "../../dependencies/imgui/")
 target_compile_features(DrcdOverlayRaster PUBLIC cxx_std_20)
+# Cemu links the static CRT on Windows; keep this helper library compatible.
+set_property(TARGET DrcdOverlayRaster PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 # This pixel loop must remain realtime even in the emulator's Debug build.
 target_compile_options(DrcdOverlayRaster PRIVATE $<$<CXX_COMPILER_ID:GNU,Clang>:-O2>)
 
@@ -12,6 +14,7 @@ add_executable(CemuDrcdOverlayTests EXCLUDE_FROM_ALL
 	../../dependencies/imgui/imgui_widgets.cpp
 )
 target_link_libraries(CemuDrcdOverlayTests PRIVATE DrcdOverlayRaster)
+set_property(TARGET CemuDrcdOverlayTests PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 add_library(imguiImpl
 	imgui_extension.cpp

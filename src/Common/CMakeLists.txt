@@ -30,11 +30,13 @@ add_library(CemuCommon
 add_library(CemuBaristaAppHookColorPattern STATIC BaristaAppHookColorTest.cpp)
 target_include_directories(CemuBaristaAppHookColorPattern PUBLIC "../")
 target_compile_features(CemuBaristaAppHookColorPattern PUBLIC cxx_std_20)
+set_property(TARGET CemuBaristaAppHookColorPattern PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 # Do not let a Debug build's pixel-generation cost confound the streaming test.
 target_compile_options(CemuBaristaAppHookColorPattern PRIVATE $<$<CXX_COMPILER_ID:GNU,Clang>:-O2>)
 target_link_libraries(CemuCommon PRIVATE CemuBaristaAppHookColorPattern)
 add_executable(CemuBaristaAppHookColorTestTests EXCLUDE_FROM_ALL BaristaAppHookColorTestTests.cpp)
 target_link_libraries(CemuBaristaAppHookColorTestTests PRIVATE CemuBaristaAppHookColorPattern)
+set_property(TARGET CemuBaristaAppHookColorTestTests PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 set_property(TARGET CemuCommon PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
